@@ -6,7 +6,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import com.library.enums.StatusType;
+import com.library.entity.enums.StatusType;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -46,7 +46,7 @@ public class User {
     private String phone;
 
     @Column(name = "role", length = 20, nullable = false)
-    private String role = "READER";
+    private String role = "READER";//vs "ADMIN"
     
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 20, nullable = false)

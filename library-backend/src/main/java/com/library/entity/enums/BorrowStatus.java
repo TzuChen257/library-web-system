@@ -1,4 +1,4 @@
-package com.library.enums;
+package com.library.entity.enums;
 
 public enum BorrowStatus {
 	BORROWED,//借閱中

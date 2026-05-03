@@ -6,7 +6,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import com.library.enums.ReservationStatus;
+import com.library.entity.enums.ReservationStatus;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

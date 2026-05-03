@@ -1,4 +1,4 @@
-package com.library.enums;
+package com.library.entity.enums;
 
 public enum MessageType {
 	GENERAL,//一般訊息

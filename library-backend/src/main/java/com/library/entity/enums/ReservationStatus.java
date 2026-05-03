@@ -1,4 +1,4 @@
-package com.library.enums;
+package com.library.entity.enums;
 
 public enum ReservationStatus {
 	WAITING,//等待中
