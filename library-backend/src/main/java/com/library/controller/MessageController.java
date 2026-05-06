@@ -3,6 +3,7 @@ package com.library.controller;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,6 +35,12 @@ public class MessageController {
 	public ApiResponse<Void> markAsRead(@PathVariable Long messageId){
 		messageService.markAsRead(messageId);
 		return ApiResponse.success("已標記為已讀");
+	}
+	
+	@DeleteMapping("/{messageId}")
+	public ApiResponse<Void> deleteMyMessage(@PathVariable Long messageId) {
+	    messageService.deleteMyMessage(messageId);
+	    return ApiResponse.success("刪除訊息成功");
 	}
 	
 }

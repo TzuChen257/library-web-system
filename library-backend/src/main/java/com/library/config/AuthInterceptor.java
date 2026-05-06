@@ -1,5 +1,6 @@
 package com.library.config;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -15,18 +16,20 @@ import jakarta.servlet.http.HttpServletResponse;
 @Component//統一檢查 Authorization Header
 public class AuthInterceptor implements HandlerInterceptor{
 	
-	private final JwtUtil jwtUtil;
+	@Autowired
+	private JwtUtil jwtUtil;
 	
-	public AuthInterceptor(JwtUtil jwtUtil) {
-		super();
-		this.jwtUtil = jwtUtil;
-	}
-
 	@Override
 	public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
 			throws Exception {
+		if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
 		String authHeader=request.getHeader("Authorization");
-		if(authHeader==null||!authHeader.startsWith("Bearer ")) {
+		if (authHeader == null || authHeader.trim().isEmpty()) {//給有些無需登入的頁面用，後續在service驗證身分
+            return true;
+        }
+		if(!authHeader.startsWith("Bearer ")) {
 			throw new LibraryBusinessException(ResponseCode.UNAUTHORIZED,"請先登入");
 		}
 		String token=authHeader.substring(7);

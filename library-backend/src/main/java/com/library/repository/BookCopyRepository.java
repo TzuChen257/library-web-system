@@ -16,4 +16,12 @@ public interface BookCopyRepository extends JpaRepository<BookCopy,String>{
 	Optional<BookCopy> findFirstByBook_BookIdAndCopyStatusOrderByCopyIdAsc(
 			String bookId,BookCopyStatus copyStatus);//借書時找第一本可借館藏
 	List<BookCopy> findByBook_BookIdOrderByCopyIdAsc(String bookId);//書籍詳情頁顯示館藏清單
+	//管理員
+	boolean existsByCopyCode(String copyCode);//新增館藏時檢查條碼是否重複
+    boolean existsByCopyCodeAndCopyIdNot(String copyCode, String copyId);//修改館藏時檢查條碼是否被其他館藏使用
+    List<BookCopy> findByBook_BookId(String bookId);//查某一本書底下的所有館藏
+    List<BookCopy> findByCopyStatus(BookCopyStatus copyStatus);//管理員依館藏狀態查詢
+    List<BookCopy> findByBook_BookIdAndCopyStatus(String bookId,BookCopyStatus copyStatus);//依書目 + 館藏狀態查詢
+    List<BookCopy> findByCopyCodeContaining(String keyword);//用條碼搜尋館藏
+
 }

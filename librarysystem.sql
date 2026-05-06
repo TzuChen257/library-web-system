@@ -137,6 +137,9 @@ CREATE TABLE `borrow_records` (
   `borrow_status` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'BORROWED' COMMENT 'BORROWED=借閱中, RETURN_PENDING=歸還待審核, RETURNED=已歸還, OVERDUE=逾期, LOST=遺失',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `due_soon_notice_sent_at` datetime DEFAULT NULL COMMENT '到期前一天通知寄送時間',
+  `overdue_notice_sent_at` datetime DEFAULT NULL COMMENT '逾期通知寄送時間',
+  `overdue_7_notice_sent_at` datetime DEFAULT NULL COMMENT '逾期7日通知寄送時間',
   PRIMARY KEY (`borrow_id`),
   KEY `idx_borrow_records_user_id` (`user_id`),
   KEY `idx_borrow_records_copy_id` (`copy_id`),
@@ -250,6 +253,7 @@ CREATE TABLE `users` (
   `status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE=啟用, DISABLED=停用',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `borrow_suspended` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否暫停借書',
   PRIMARY KEY (`user_id`),
   UNIQUE KEY `username` (`username`),
   UNIQUE KEY `email` (`email`),
@@ -265,7 +269,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES ('U00000001','admin','admin123','系統管理員','admin@example.com',NULL,'ADMIN','ACTIVE','2026-04-28 22:18:46','2026-04-28 22:18:46'),('U00000002','reader01','reader123','測試讀者','reader01@example.com',NULL,'READER','ACTIVE','2026-04-28 22:18:46','2026-04-28 22:18:46');
+INSERT INTO `users` VALUES ('U00000001','admin','admin123','系統管理員','admin@example.com',NULL,'ADMIN','ACTIVE','2026-04-28 22:18:46','2026-04-28 22:18:46',0),('U00000002','reader01','reader123','測試讀者','reader01@example.com',NULL,'READER','ACTIVE','2026-04-28 22:18:46','2026-04-28 22:18:46',0);
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -278,4 +282,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-04-29  7:32:33
+-- Dump completed on 2026-05-06 11:22:24

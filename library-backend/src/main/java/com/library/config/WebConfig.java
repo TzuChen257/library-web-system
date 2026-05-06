@@ -1,5 +1,6 @@
 package com.library.config;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
@@ -8,12 +9,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer{
 	
-	private final AuthInterceptor authInterceptor;
-
-	public WebConfig(AuthInterceptor authInterceptor) {
-		super();
-		this.authInterceptor = authInterceptor;
-	}
+	@Autowired
+	private AuthInterceptor authInterceptor;
 
 	@Override
 	public void addCorsMappings(CorsRegistry registry) {
@@ -28,12 +25,7 @@ public class WebConfig implements WebMvcConfigurer{
 	public void addInterceptors(InterceptorRegistry registry) {
 		registry.addInterceptor(authInterceptor)
 				.addPathPatterns("/api/**")
-				.excludePathPatterns(
-						"/api/auth/login",
-						"/api/books",
-						"/api/books/**",
-						"/api/book-categories",
-						"/api/book-categories/**");//以下不用驗證
+				.excludePathPatterns("/api/auth/login","/api/auth/register");//以下不用進interceptor抓token
 	}
 	
 }

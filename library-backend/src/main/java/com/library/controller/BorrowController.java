@@ -12,14 +12,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.library.dto.borrow.BorrowResponse;
 import com.library.dto.common.ApiResponse;
-import com.library.service.impl.BorrowServiceImpl;
+import com.library.service.BorrowService;
 
 @RestController
 @RequestMapping("/api/borrows")
 public class BorrowController {
 	
 	@Autowired
-	private BorrowServiceImpl borrowService;
+	private BorrowService borrowService;
 	
 	@PostMapping("/{bookId}")
 	public ApiResponse<BorrowResponse> borrowBook(@PathVariable String bookId){

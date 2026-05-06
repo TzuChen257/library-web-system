@@ -1,5 +1,6 @@
 package com.library.repository;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -21,4 +22,11 @@ public interface BorrowRecordRepository extends JpaRepository<BorrowRecord,Long>
 	List<BorrowRecord> findByBorrowStatusOrderByCreatedAtDesc(BorrowStatus borrowStatus);
 	//管理員：查找所有借閱紀錄
 	List<BorrowRecord> findAllByOrderByCreatedAtDesc();
+	//逾期處理
+	List<BorrowRecord> findByBorrowStatusAndDueDateAndDueSoonNoticeSentAtIsNull(
+            BorrowStatus borrowStatus,LocalDate dueDate);
+    List<BorrowRecord> findByBorrowStatusAndDueDateAndOverdueNoticeSentAtIsNull(
+            BorrowStatus borrowStatus,LocalDate dueDate);
+    List<BorrowRecord> findByBorrowStatusAndDueDateLessThanEqualAndOverdue7NoticeSentAtIsNull(
+            BorrowStatus borrowStatus,LocalDate dueDate);
 }

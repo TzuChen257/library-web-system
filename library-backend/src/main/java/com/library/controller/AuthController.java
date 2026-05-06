@@ -8,7 +8,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.library.dto.auth.LoginRequest;
 import com.library.dto.auth.LoginResponse;
+import com.library.dto.auth.RegisterRequest;
 import com.library.dto.common.ApiResponse;
+import com.library.dto.user.UserResponse;
 import com.library.service.AuthService;
 
 @RestController
@@ -23,10 +25,15 @@ public class AuthController {
 		LoginResponse response=authService.login(request);
 		return ApiResponse.success("登入成功",response);
 	}
-	/*
-	@PostMapping("logout")
-	public ApiResponse<?> logout(){
-		return ApiResponse<?>(sucess,message);
-	}
-	*/
+	
+	@PostMapping("/register")
+    public ApiResponse<UserResponse> registerReader(@RequestBody RegisterRequest request) {
+        return ApiResponse.success("註冊成功", authService.registerReader(request));
+    }
+
+	@PostMapping("/logout")
+    public ApiResponse<Void> logout() {
+        authService.logout();
+        return ApiResponse.success("登出成功");
+    }
 }

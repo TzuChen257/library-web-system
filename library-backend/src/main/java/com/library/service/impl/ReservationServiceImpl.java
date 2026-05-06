@@ -18,12 +18,15 @@ import com.library.exception.ResponseCode;
 import com.library.repository.BookRepository;
 import com.library.repository.ReservationRepository;
 import com.library.repository.UserRepository;
-import com.library.service.MessageService;
+import com.library.service.NotificationService;
 import com.library.service.ReservationService;
 import com.library.util.security.LoginUserHolder;
 
+import lombok.AllArgsConstructor;
+
 @Service
 @Transactional
+@AllArgsConstructor
 public class ReservationServiceImpl implements ReservationService{
 	
 	private static final int RESERVATION_EXPIRE_HOURS = 48;
@@ -31,16 +34,7 @@ public class ReservationServiceImpl implements ReservationService{
 	private ReservationRepository reservationRepository;
     private BookRepository bookRepository;
     private UserRepository userRepository;
-    private MessageService messageService;
-
-	public ReservationServiceImpl(ReservationRepository reservationRepository, BookRepository bookRepository,
-			UserRepository userRepository, MessageService messageService) {
-		super();
-		this.reservationRepository = reservationRepository;
-		this.bookRepository = bookRepository;
-		this.userRepository = userRepository;
-		this.messageService = messageService;
-	}
+    private NotificationService notificationService;
 
 	@Override
 	public ReservationResponse reserveBook(String bookId) {
@@ -131,7 +125,10 @@ public class ReservationServiceImpl implements ReservationService{
 
         Reservation savedReservation = reservationRepository.save(reservation);
 
-        messageService.createReservationNoticeMessage(savedReservation.getUser(),savedReservation);
+        notificationService.notifyReservationAvailable(
+                savedReservation.getUser(),
+                savedReservation
+        );
 
         return toReservationResponse(savedReservation);
 	}

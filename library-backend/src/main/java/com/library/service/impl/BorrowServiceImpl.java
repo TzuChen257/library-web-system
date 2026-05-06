@@ -22,11 +22,14 @@ import com.library.repository.BookRepository;
 import com.library.repository.BorrowRecordRepository;
 import com.library.repository.UserRepository;
 import com.library.service.BorrowService;
-import com.library.service.MessageService;
+import com.library.service.NotificationService;
 import com.library.util.security.LoginUserHolder;
+
+import lombok.AllArgsConstructor;
 
 @Service
 @Transactional//會做transaction因為要修改資料
+@AllArgsConstructor
 public class BorrowServiceImpl implements BorrowService{
 
 	private static final int MAX_CURRENT_BORROW_COUNT=5;
@@ -36,26 +39,24 @@ public class BorrowServiceImpl implements BorrowService{
 	private BookRepository bookRepository;
 	private BookCopyRepository bookCopyRepository;
 	private UserRepository userRepository;
-	private MessageService messageService;
-
-	public BorrowServiceImpl(BorrowRecordRepository borrowRecordRepository, BookRepository bookRepository,
-			BookCopyRepository bookCopyRepository, UserRepository userRepository, MessageService messageService) {
-		super();
-		this.borrowRecordRepository = borrowRecordRepository;
-		this.bookRepository = bookRepository;
-		this.bookCopyRepository = bookCopyRepository;
-		this.userRepository = userRepository;
-		this.messageService = messageService;
-	}
+	private NotificationService notificationService;
 
 	@Override
 	public BorrowResponse borrowBook(String bookId) {
-		User currentUser=getCurrentReader();
+		User currentReader=getCurrentReader();
+		
+		if (Boolean.TRUE.equals(currentReader.getBorrowSuspended())) {
+		    throw new LibraryBusinessException(
+		            ResponseCode.FORBIDDEN,
+		            "您的借書功能已暫停，請聯繫管理員處理逾期書籍與開通借閱權限"
+		    );
+		}
+		
 		Book book=bookRepository.findById(bookId)
 				.orElseThrow(()->new LibraryBusinessException(ResponseCode.BOOK_NOT_FOUND));
 		//確認可以借
 		long currentBorrowCount=borrowRecordRepository.countByUser_UserIdAndBorrowStatusIn(
-				currentUser.getUserId(),
+				currentReader.getUserId(),
 				Arrays.asList(BorrowStatus.BORROWED,BorrowStatus.RETURN_PENDING,BorrowStatus.OVERDUE));
 		
 		if(currentBorrowCount>=MAX_CURRENT_BORROW_COUNT) {
@@ -73,7 +74,7 @@ public class BorrowServiceImpl implements BorrowService{
 		LocalDate today=LocalDate.now();
 		
 		BorrowRecord record=new BorrowRecord();
-		record.setUser(currentUser);
+		record.setUser(currentReader);
         record.setBookCopy(copy);
         record.setBorrowDate(today);
         record.setDueDate(today.plusDays(DEFAULT_BORROW_DAYS));
@@ -81,7 +82,7 @@ public class BorrowServiceImpl implements BorrowService{
         
         BorrowRecord savedRecord=borrowRecordRepository.save(record);
         //訊息確認
-        messageService.createBorrowSuccessMessage(currentUser, savedRecord);
+        notificationService.notifyBorrowSuccess(currentReader, savedRecord);
 		
 		return toBorrowResponse(savedRecord);
 	}
@@ -178,7 +179,7 @@ public class BorrowServiceImpl implements BorrowService{
         bookCopyRepository.save(copy);
         BorrowRecord savedRecord = borrowRecordRepository.save(record);
 
-        messageService.createReturnResultMessage(savedRecord.getUser(), savedRecord);
+        notificationService.notifyReturnResult(savedRecord.getUser(), savedRecord);
 
         return toBorrowResponse(savedRecord);
 	}

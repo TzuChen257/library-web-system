@@ -68,4 +68,13 @@ public class BorrowRecord {
     @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+    
+    @Column(name = "due_soon_notice_sent_at")
+    private LocalDateTime dueSoonNoticeSentAt;
+
+    @Column(name = "overdue_notice_sent_at")
+    private LocalDateTime overdueNoticeSentAt;
+
+    @Column(name = "overdue_7_notice_sent_at")
+    private LocalDateTime overdue7NoticeSentAt;
 }

@@ -59,4 +59,7 @@ public class User {
     @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+    
+    @Column(name = "borrow_suspended", nullable = false)
+    private Boolean borrowSuspended = false;
 }

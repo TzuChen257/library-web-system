@@ -29,53 +29,23 @@ public class MessageServiceImpl implements MessageService{
 	private MessageRepository messageRepository;
 
 	@Override
-	public void createBorrowSuccessMessage(User receiver, BorrowRecord borrowRecord) {
-		Book book = borrowRecord.getBookCopy().getBook();
-
-        Message message = new Message();
-
-        message.setReceiver(receiver);
-        message.setTitle("借閱成功通知");
-        message.setContent("您已成功借閱《"+book.getTitle()
-                        +"》，應歸還日為 "+borrowRecord.getDueDate()+"。");
-        message.setMessageType(MessageType.BORROW);
-        message.setIsRead(false);
-        message.setRelatedBorrow(borrowRecord);
-
-        messageRepository.save(message);
-	}
-
-	@Override
-	public void createReturnResultMessage(User receiver, BorrowRecord borrowRecord) {
-		Book book = borrowRecord.getBookCopy().getBook();
-
-        Message message = new Message();
-
-        message.setReceiver(receiver);
-        message.setTitle("歸還審核通知");
-        message.setContent("您借閱的《"+book.getTitle()+"》歸還狀態已更新為："
-                        +borrowRecord.getBorrowStatus().name()+"。");
-        message.setMessageType(MessageType.RETURN);
-        message.setIsRead(false);
-        message.setRelatedBorrow(borrowRecord);
-
-        messageRepository.save(message);
-	}
-	
-	@Override
-	public void createReservationNoticeMessage(User receiver, Reservation reservation) {
-		Book book = reservation.getBook();
+	public void createSystemMessage(
+	        User receiver,
+	        String title,
+	        String content,
+	        MessageType messageType,
+	        BorrowRecord relatedBorrow,
+	        Reservation relatedReservation
+	) {
 	    Message message = new Message();
 
 	    message.setReceiver(receiver);
-	    message.setTitle("預約書籍可借通知");
-	    message.setContent("您預約的《" + book.getTitle()
-	            + "》目前已有可借館藏，請於 "
-	            + reservation.getExpireDate()
-	            + " 前完成借閱或洽管理員處理。");
-	    message.setMessageType(MessageType.RESERVATION);
+	    message.setTitle(title);
+	    message.setContent(content);
+	    message.setMessageType(messageType);
 	    message.setIsRead(false);
-	    message.setRelatedReservation(reservation);
+	    message.setRelatedBorrow(relatedBorrow);
+	    message.setRelatedReservation(relatedReservation);
 
 	    messageRepository.save(message);
 	}
@@ -107,6 +77,17 @@ public class MessageServiceImpl implements MessageService{
 			message.setReadAt(LocalDateTime.now());
 			messageRepository.save(message);
 		}
+	}
+	
+	@Override
+	public void deleteMyMessage(Long messageId) {
+		String userId=LoginUserHolder.requireLoginUser().getUserId();
+
+	    Message message = messageRepository
+	            .findByMessageIdAndReceiver_UserId(messageId, userId)
+	            .orElseThrow(() -> new LibraryBusinessException(ResponseCode.MESSAGE_NOT_FOUND));
+
+	    messageRepository.delete(message);
 	}
 	
 	private MessageResponse toMessageResponse(Message message) {
