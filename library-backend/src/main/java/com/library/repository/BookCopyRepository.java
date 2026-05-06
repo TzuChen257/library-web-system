@@ -23,5 +23,6 @@ public interface BookCopyRepository extends JpaRepository<BookCopy,String>{
     List<BookCopy> findByCopyStatus(BookCopyStatus copyStatus);//管理員依館藏狀態查詢
     List<BookCopy> findByBook_BookIdAndCopyStatus(String bookId,BookCopyStatus copyStatus);//依書目 + 館藏狀態查詢
     List<BookCopy> findByCopyCodeContaining(String keyword);//用條碼搜尋館藏
-
+    //首頁公開統計：全館可借館藏數
+    long countByCopyStatus(BookCopyStatus copyStatus);
 }

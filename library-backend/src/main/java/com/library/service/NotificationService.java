@@ -16,4 +16,8 @@ public interface NotificationService {
     void notifyOverdue(User receiver, BorrowRecord borrowRecord);
 
     void notifyOverdueSevenDays(User receiver, BorrowRecord borrowRecord);
+    
+    void notifyReservationExpired(User receiver, Reservation reservation);
+
+    void notifyAdminsReservationReady(Reservation reservation, long availableCount);
 }

@@ -14,16 +14,18 @@ import com.library.entity.enums.BorrowStatus;
 import com.library.repository.BorrowRecordRepository;
 import com.library.repository.UserRepository;
 import com.library.service.NotificationService;
+import com.library.service.ReservationService;
 
 import lombok.AllArgsConstructor;
 
 @Component
 @AllArgsConstructor
-public class OverdueNoticeScheduler {
+public class LibraryScheduler {
 
     private BorrowRecordRepository borrowRecordRepository;
     private UserRepository userRepository;
     private NotificationService notificationService;
+    private ReservationService reservationService;
 
 
     /**
@@ -94,5 +96,11 @@ public class OverdueNoticeScheduler {
             record.setOverdue7NoticeSentAt(LocalDateTime.now());
             borrowRecordRepository.save(record);
         }
+    }
+    
+    // 每 30 分鐘檢查一次，可依需要調整
+    @Scheduled(cron = "0 */30 * * * *")
+    public void checkExpiredAvailableNoticeReservations() {
+        reservationService.expireAvailableNoticeReservations();
     }
 }

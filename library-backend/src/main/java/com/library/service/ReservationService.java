@@ -16,4 +16,6 @@ public interface ReservationService {
     List<ReservationResponse> getAdminReservations(ReservationStatus reservationStatus);
 
     ReservationResponse notifyReservationAvailable(Long reservationId);
+    
+    void expireAvailableNoticeReservations();
 }

@@ -12,9 +12,11 @@ import com.library.dto.reservation.ReservationResponse;
 import com.library.entity.Book;
 import com.library.entity.Reservation;
 import com.library.entity.User;
+import com.library.entity.enums.BookCopyStatus;
 import com.library.entity.enums.ReservationStatus;
 import com.library.exception.LibraryBusinessException;
 import com.library.exception.ResponseCode;
+import com.library.repository.BookCopyRepository;
 import com.library.repository.BookRepository;
 import com.library.repository.ReservationRepository;
 import com.library.repository.UserRepository;
@@ -33,6 +35,7 @@ public class ReservationServiceImpl implements ReservationService{
 	
 	private ReservationRepository reservationRepository;
     private BookRepository bookRepository;
+    private BookCopyRepository bookCopyRepository;
     private UserRepository userRepository;
     private NotificationService notificationService;
 
@@ -93,44 +96,124 @@ public class ReservationServiceImpl implements ReservationService{
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public List<ReservationResponse> getAdminReservations(ReservationStatus reservationStatus) {
-		LoginUserHolder.requireAdmin();
 
-        List<Reservation> reservations;
+	    List<Reservation> reservations;
 
-        if (reservationStatus == null) {
-            reservations = reservationRepository.findAllByOrderByCreatedAtDesc();
-        } else {
-            reservations = reservationRepository
-                    .findByReservationStatusOrderByCreatedAtDesc(reservationStatus);
-        }
+	    if (reservationStatus == null) {
+	        reservations = reservationRepository.findAllByOrderByCreatedAtDesc();
+	    } else {
+	        reservations = reservationRepository.findByReservationStatusOrderByCreatedAtDesc(reservationStatus);
+	    }
 
-        return reservations.stream().map(this::toReservationResponse).collect(Collectors.toList());
+	    return reservations.stream()
+	            .map(this::toAdminReservationResponse)
+	            .collect(Collectors.toList());
 	}
 
 	@Override
+	@Transactional
 	public ReservationResponse notifyReservationAvailable(Long reservationId) {
-		LoginUserHolder.requireAdmin();
 
-        Reservation reservation = reservationRepository.findById(reservationId)
-                .orElseThrow(() -> new LibraryBusinessException(ResponseCode.RESERVATION_NOT_FOUND));
+	    // 1. 管理員權限確認
+	    LoginUserHolder.requireAdmin();
 
-        if (reservation.getReservationStatus() != ReservationStatus.WAITING) {
-            throw new LibraryBusinessException(
-            		ResponseCode.BAD_REQUEST,"只有 WAITING 狀態的預約可以通知");
-        }
+	    // 2. 查預約
+	    Reservation reservation = reservationRepository.findById(reservationId)
+	            .orElseThrow(() -> new LibraryBusinessException(ResponseCode.RESERVATION_NOT_FOUND));
 
-        reservation.setReservationStatus(ReservationStatus.AVAILABLE_NOTICE);
-        reservation.setExpireDate(LocalDateTime.now().plusHours(RESERVATION_EXPIRE_HOURS));
+	    // 3. 只能通知 WAITING 狀態
+	    if (reservation.getReservationStatus() != ReservationStatus.WAITING) {
+	        throw new LibraryBusinessException(ResponseCode.RESERVATION_STATUS_INVALID);
+	    }
 
-        Reservation savedReservation = reservationRepository.save(reservation);
+	    String bookId = reservation.getBook().getBookId();
 
-        notificationService.notifyReservationAvailable(
-                savedReservation.getUser(),
-                savedReservation
-        );
+	    // 4. 必須是該書目前 WAITING 第一順位
+	    Reservation firstWaiting = reservationRepository
+	            .findFirstByBook_BookIdAndReservationStatusOrderByReservationDateAsc(
+	                    bookId,
+	                    ReservationStatus.WAITING
+	            )
+	            .orElseThrow(() -> new LibraryBusinessException(ResponseCode.RESERVATION_NOT_FOUND));
 
-        return toReservationResponse(savedReservation);
+	    if (!firstWaiting.getReservationId().equals(reservation.getReservationId())) {
+	        throw new LibraryBusinessException(ResponseCode.RESERVATION_NOT_FIRST_QUEUE);
+	    }
+
+	    // 5. 必須真的有 AVAILABLE 館藏
+	    long availableCount = bookCopyRepository.countByBook_BookIdAndCopyStatus(
+	            bookId,
+	            BookCopyStatus.AVAILABLE
+	    );
+
+	    if (availableCount <= 0) {
+	        throw new LibraryBusinessException(ResponseCode.NO_AVAILABLE_COPY_FOR_RESERVATION);
+	    }
+
+	    // 6. 改為已通知可取，並設定 48 小時後過期
+	    LocalDateTime now = LocalDateTime.now();
+
+	    reservation.setReservationStatus(ReservationStatus.AVAILABLE_NOTICE);
+	    reservation.setExpireDate(now.plusHours(RESERVATION_EXPIRE_HOURS));
+
+	    Reservation saved = reservationRepository.save(reservation);
+
+	    // 7. 通知該讀者
+	    notificationService.notifyReservationAvailable(saved.getUser(), saved);
+
+	    return toReservationResponse(saved);
+	}
+	
+	@Override
+	@Transactional
+	public void expireAvailableNoticeReservations() {
+
+	    LocalDateTime now = LocalDateTime.now();
+
+	    List<Reservation> expiredReservations =
+	            reservationRepository.findByReservationStatusAndExpireDateBefore(
+	                    ReservationStatus.AVAILABLE_NOTICE,
+	                    now
+	            );
+
+	    for (Reservation reservation : expiredReservations) {
+	        reservation.setReservationStatus(ReservationStatus.EXPIRED);
+
+	        Reservation saved = reservationRepository.save(reservation);
+
+	        // 通知原預約讀者：預約取書期限已過
+	        notificationService.notifyReservationExpired(saved.getUser(), saved);
+
+	        // 通知管理員：可處理下一順位
+	        notifyAdminsIfNextReservationCanBeNotified(saved.getBook());
+	    }
+	}
+	
+	private void notifyAdminsIfNextReservationCanBeNotified(Book book) {
+
+	    Reservation nextWaiting = reservationRepository
+	            .findFirstByBook_BookIdAndReservationStatusOrderByReservationDateAsc(
+	                    book.getBookId(),
+	                    ReservationStatus.WAITING
+	            )
+	            .orElse(null);
+
+	    if (nextWaiting == null) {
+	        return;
+	    }
+
+	    long availableCount = bookCopyRepository.countByBook_BookIdAndCopyStatus(
+	            book.getBookId(),
+	            BookCopyStatus.AVAILABLE
+	    );
+
+	    if (availableCount <= 0) {
+	        return;
+	    }
+
+	    notificationService.notifyAdminsReservationReady(nextWaiting, availableCount);
 	}
 	
 	private User getCurrentReader() {
@@ -162,6 +245,60 @@ public class ReservationServiceImpl implements ReservationService{
         response.setQueueOrder(reservation.getQueueOrder());
 
         return response;
+    }
+    
+    private ReservationResponse toAdminResponse(
+            Reservation reservation,
+            int availableCopyCount,
+            boolean firstInQueue,
+            boolean canNotify
+    ) {
+        ReservationResponse response = toReservationResponse(reservation);
+
+        response.setAvailableCopyCount(availableCopyCount);
+        response.setFirstInQueue(firstInQueue);
+        response.setCanNotify(canNotify);
+
+        return response;
+    }
+    
+    private ReservationResponse toAdminReservationResponse(Reservation reservation) {
+
+        String bookId = reservation.getBook().getBookId();
+
+        long availableCount = bookCopyRepository.countByBook_BookIdAndCopyStatus(
+                bookId,
+                BookCopyStatus.AVAILABLE
+        );
+
+        boolean firstInQueue = isFirstWaitingReservation(reservation);
+
+        boolean canNotify =
+                reservation.getReservationStatus() == ReservationStatus.WAITING
+                && firstInQueue
+                && availableCount > 0;
+
+        return toAdminResponse(
+                reservation,
+                (int) availableCount,
+                firstInQueue,
+                canNotify
+        );
+    }
+    
+    private boolean isFirstWaitingReservation(Reservation reservation) {
+
+        if (reservation.getReservationStatus() != ReservationStatus.WAITING) {
+            return false;
+        }
+
+        return reservationRepository
+                .findFirstByBook_BookIdAndReservationStatusOrderByReservationDateAsc(
+                        reservation.getBook().getBookId(),
+                        ReservationStatus.WAITING
+                )
+                .map(first -> first.getReservationId().equals(reservation.getReservationId()))
+                .orElse(false);
     }
 
 }

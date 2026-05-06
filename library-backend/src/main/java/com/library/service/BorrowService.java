@@ -14,4 +14,5 @@ public interface BorrowService {
     List<BorrowResponse> getAdminBorrows(BorrowStatus borrowStatus);
     List<BorrowResponse> getReturnPendingBorrows();
     BorrowResponse approveReturn(Long borrowId, BorrowStatus resultStatus);
+    List<BorrowResponse> batchApproveNormalReturn(List<Long> borrowIds);
 }

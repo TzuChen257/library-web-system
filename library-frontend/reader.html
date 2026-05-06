@@ -1,0 +1,217 @@
+<!doctype html>
+<html ng-app="LibraryApp">
+<head>
+    <meta charset="utf-8">
+    <title>讀者中心｜iRead Library</title>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+    <script src="./js/app.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/reader.js"></script>
+
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+
+<body ng-controller="ReaderCenterController">
+
+    <h1>iRead Library 圖書館系統</h1>
+    <h2>讀者中心</h2>
+
+    <div ng-include="'partials/reader-nav.html'"></div>
+
+    <hr>
+
+    <div class="tab-card-row">
+        <button type="button"
+                class="tab-card"
+                ng-class="{active: currentTab == 'borrows'}"
+                ng-click="setReaderTab('borrows')">
+            我的借閱
+        </button>
+
+        <button type="button"
+                class="tab-card"
+                ng-class="{active: currentTab == 'reservations'}"
+                ng-click="setReaderTab('reservations')">
+            我的預約
+        </button>
+    </div>
+
+    <p style="color:red;" ng-if="errorMessage">
+        {{ errorMessage }}
+    </p>
+
+    <!-- 我的借閱 -->
+    <section class="panel-card" ng-if="currentTab == 'borrows'">
+        <h3>我的借閱</h3>
+
+        <p>
+            目前借閱：共 {{ borrows.length }} 筆
+            <button type="button" ng-click="loadBorrows()">重新整理</button>
+        </p>
+
+        <table>
+            <tr>
+                <th>借閱ID</th>
+                <th>書名</th>
+                <th>館藏條碼</th>
+                <th>借閱日期</th>
+                <th>到期日</th>
+                <th>申請歸還日</th>
+                <th>狀態</th>
+                <th>操作</th>
+            </tr>
+
+            <tr ng-repeat="borrow in pagedBorrows()">
+                <td>{{ borrow.borrowId }}</td>
+
+                <td>
+                    {{ borrow.title || borrow.bookTitle || '無書名資料' }}
+                </td>
+
+                <td>
+                    {{ borrow.copyCode || borrow.bookCopyCode || '' }}
+                </td>
+
+                <td>{{ borrow.borrowDate }}</td>
+
+                <td>
+                    <span ng-class="{ 'overdue-text': borrow.borrowStatus == 'OVERDUE' }">
+                        {{ borrow.dueDate }}
+                    </span>
+                </td>
+
+                <td>{{ borrow.returnRequestDate || borrow.requestReturnDate || '' }}</td>
+
+                <td>{{ borrowStatusText(borrow.borrowStatus) }}</td>
+
+                <td>
+                    <button type="button"
+                            ng-click="requestReturn(borrow)"
+                            ng-if="canRequestReturn(borrow)">
+                        申請歸還
+                    </button>
+
+                    <span ng-if="borrow.borrowStatus == 'RETURN_PENDING'">
+                        等待管理員審核
+                    </span>
+
+                    <span ng-if="!canRequestReturn(borrow) && borrow.borrowStatus != 'RETURN_PENDING'">
+                        -
+                    </span>
+                </td>
+            </tr>
+
+            <tr ng-if="borrows.length == 0">
+                <td colspan="8">目前沒有借閱紀錄</td>
+            </tr>
+        </table>
+
+        <div style="margin-top: 20px;" ng-if="borrows.length > 0">
+            <button type="button"
+                    ng-click="prevBorrowPage()"
+                    ng-disabled="borrowPage == 0">
+                上一頁
+            </button>
+
+            第 {{ borrowPage + 1 }} 頁 / 共 {{ numberOfBorrowPages() }} 頁
+
+            <button type="button"
+                    ng-click="nextBorrowPage()"
+                    ng-disabled="borrowPage >= numberOfBorrowPages() - 1">
+                下一頁
+            </button>
+        </div>
+    </section>
+
+    <!-- 我的預約 -->
+    <section class="panel-card" ng-if="currentTab == 'reservations'">
+        <h3>我的預約</h3>
+
+        <p>
+            我的預約：共 {{ reservations.length }} 筆
+            <button type="button" ng-click="loadReservations()">重新整理</button>
+        </p>
+
+        <table>
+            <tr>
+                <th>預約ID</th>
+                <th>書名</th>
+                <th>作者</th>
+                <th>預約日期</th>
+                <th>保留到期</th>
+                <th>順位</th>
+                <th>狀態</th>
+                <th>操作</th>
+            </tr>
+
+            <tr ng-repeat="reservation in pagedReservations()">
+                <td>{{ reservation.reservationId }}</td>
+
+                <td>
+                    {{ reservation.title || reservation.bookTitle || '無書名資料' }}
+                </td>
+
+                <td>
+                    {{ reservation.author || reservation.bookAuthor || '' }}
+                </td>
+
+                <td>
+                    {{ formatDateTime(reservation.reservationDate || reservation.createdAt) }}
+                </td>
+
+                <td>
+                    {{ formatDateTime(reservation.expireDate) }}
+                </td>
+
+                <td>
+                    {{ reservation.queueOrder || reservation.queue_order || '-' }}
+                </td>
+
+                <td>
+                    {{ reservationStatusText(reservation.reservationStatus) }}
+                </td>
+
+                <td>
+                    <button type="button"
+                            ng-click="borrowReservedBook(reservation)"
+                            ng-if="canBorrowReservedBook(reservation)">
+                        借閱
+                    </button>
+
+                    <button type="button"
+                            ng-click="cancelReservation(reservation)"
+                            ng-if="canCancelReservation(reservation)">
+                        取消預約
+                    </button>
+
+                    <span ng-if="!canBorrowReservedBook(reservation) && !canCancelReservation(reservation)">
+                        -
+                    </span>
+                </td>
+            </tr>
+
+            <tr ng-if="reservations.length == 0">
+                <td colspan="8">目前沒有預約紀錄</td>
+            </tr>
+        </table>
+
+        <div style="margin-top: 20px;" ng-if="reservations.length > 0">
+            <button type="button"
+                    ng-click="prevReservationPage()"
+                    ng-disabled="reservationPage == 0">
+                上一頁
+            </button>
+
+            第 {{ reservationPage + 1 }} 頁 / 共 {{ numberOfReservationPages() }} 頁
+
+            <button type="button"
+                    ng-click="nextReservationPage()"
+                    ng-disabled="reservationPage >= numberOfReservationPages() - 1">
+                下一頁
+            </button>
+        </div>
+    </section>
+
+</body>
+</html>

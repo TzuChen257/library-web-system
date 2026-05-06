@@ -1,0 +1,109 @@
+<!doctype html>
+<html ng-app="LibraryApp">
+<head>
+    <meta charset="utf-8">
+    <title>個人資料｜iRead Library</title>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+    <script src="./js/app.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/profile.js"></script>
+
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+
+<body ng-controller="ProfileController">
+
+    <h1>iRead Library 圖書館系統</h1>
+    <h2>個人資料</h2>
+
+    <div ng-if="loginUser && loginUser.role == 'ADMIN'"
+        ng-include="'partials/admin-nav.html'"></div>
+
+    <div ng-if="!loginUser || loginUser.role != 'ADMIN'"
+        ng-include="'partials/reader-nav.html'"></div>
+
+    <p style="color:red;" ng-if="errorMessage">
+        {{ errorMessage }}
+    </p>
+
+    <p ng-if="loading">
+        資料載入中...
+    </p>
+
+    <div ng-if="user && !loading">
+
+        <table>
+            <tr>
+                <td>使用者ID</td>
+                <td>{{ user.userId }}</td>
+            </tr>
+
+            <tr>
+                <td>帳號</td>
+                <td>{{ user.username }}</td>
+            </tr>
+
+            <tr>
+                <td>姓名</td>
+                <td>{{ user.name }}</td>
+            </tr>
+
+            <tr>
+                <td>Email</td>
+                <td>{{ user.email }}</td>
+            </tr>
+
+            <tr>
+                <td>電話</td>
+                <td>{{ user.phone || '未填寫' }}</td>
+            </tr>
+
+            <tr>
+                <td>角色</td>
+                <td>{{ roleText(user.role) }}</td>
+            </tr>
+
+            <tr>
+                <td>帳號狀態</td>
+                <td>{{ statusText(user.status) }}</td>
+            </tr>
+
+            <tr>
+                <td>借書權限</td>
+                <td>
+                    <span ng-if="isBorrowSuspended(user)" style="color:red;">
+                        暫停借書
+                    </span>
+
+                    <span ng-if="!isBorrowSuspended(user)">
+                        正常
+                    </span>
+                </td>
+            </tr>
+
+            <tr>
+                <td>建立時間</td>
+                <td>{{ formatDateTime(user.createdAt) }}</td>
+            </tr>
+
+            <tr>
+                <td>更新時間</td>
+                <td>{{ formatDateTime(user.updatedAt) }}</td>
+            </tr>
+        </table>
+
+        <br>
+
+        <div ng-if="isBorrowSuspended(user)" style="color:red;">
+            你的借書權限目前已暫停，如需恢復請聯繫管理員。
+        </div>
+
+        <div ng-if="user.status == 'DISABLED'" style="color:red;">
+            此帳號目前為停用狀態。
+        </div>
+
+    </div>
+
+</body>
+</html>

@@ -1,9 +1,9 @@
 # 圖書館館藏管理系統需求文件
 
-> 版本：v1.2  
-> 修訂依據：目前 Spring Boot 後端架構與 API 實作狀態  
+> 版本：v1.3  
+> 修訂依據：目前 Spring Boot 後端架構、API 實作狀態與前端整合頁面  
 > 後端：Eclipse + Spring Boot + Spring Data JPA + JWT + Scheduler + Mail  
-> 前端：VSCode + Angular 6+，可少量搭配 jQuery  
+> 前端：VSCode + AngularJS 1.x 風格（HTML + JS + `$scope` + `$http`），可少量搭配 jQuery  
 > 資料庫：MySQL  
 >
 > 本版修訂重點：
@@ -18,7 +18,11 @@
 > 9. 逾期 7 日後暫停讀者借書功能，管理員可重新開通。
 > 10. DTO 採必要最小化原則：多欄位資料使用 Request DTO，單一或少量簡單欄位優先使用 `@PathVariable` / `@RequestParam`。
 > 11. 移除所有讀書心得功能。
-> 12. Excel 匯入匯出保留為後續擴充項目。
+> 12. 新增首頁公開統計：館藏書目數、可借館藏數、今日借閱數、本月借閱數、本月熱門借閱 Top 5。
+> 13. 新增管理員統計摘要 API，後台首頁改由統一統計 API 取得資料。
+> 14. 新增 Apache POI Excel 報表下載，支援年度每月借閱統計、熱門書籍排行、讀者借閱排行。
+> 15. 新增書目與館藏 Excel 匯入：提供匯入範本下載與批次匯入結果回傳。
+> 16. 前端整合為 `reader.html` 讀者中心與 `admin.html` 管理員中心，以 tab / card 方式切換功能。
 
 ---
 
@@ -32,7 +36,7 @@
 
 本系統目標是將原本桌面式 Java Swing 圖書館管理系統改寫為前後端分離的 Web 系統。讀者可以在線上註冊、登入、查詢館藏、借閱書籍、申請歸還、預約書籍、查看訊息與接收逾期提醒；管理員可以維護書目資料、管理每一本實體館藏、審核歸還、管理使用者、處理預約通知與開通讀者借書權限。
 
-系統通知以站內訊息為基礎，並針對時效性高的情境整合 Email，例如預約可取、到期前一天、逾期當下與逾期 7 日借書權限暫停通知。
+系統通知以站內訊息為基礎，並針對時效性高的情境整合 Email，例如預約可取、到期前一天、逾期當下與逾期 7 日借書權限暫停通知。新版 Web 系統另補齊首頁公開統計、管理員後台統計、年度 Excel 報表下載，以及書目與館藏 Excel 批次匯入，讓系統除一般借還書流程外，也具備管理展示與資料維護能力。
 
 ### 1.3 系統設計理念
 
@@ -68,9 +72,10 @@
 | 訊息通知 | 借閱、歸還、預約、逾期等系統事件建立站內訊息。 |
 | Email 通知 | 預約可取、到期前一天、逾期當下、逾期 7 日通知以 Email 強化提醒。 |
 | 逾期排程 | 每日排程檢查到期與逾期紀錄，逾期 7 日自動暫停借書。 |
-| Excel 匯入匯出 | 可列為後續擴充。 |
-
----
+| 首頁公開統計 | 訪客與登入者皆可查看館藏書目數、可借館藏數、今日借閱數、本月借閱數與本月熱門借閱 Top 5。 |
+| 管理員統計 | 管理員可查看借閱中、逾期、歸還待審核、等待預約、已通知可取、今日借閱與本月借閱等統計。 |
+| Excel 報表下載 | 管理員可下載年度借閱統計 Excel，包含每月借閱統計、熱門書籍排行與讀者借閱排行。 |
+| Excel 書目匯入 | 管理員可下載匯入範本，並上傳 Excel 批次建立書目與館藏資料。 |
 
 ## 3. 使用者角色
 
@@ -92,6 +97,7 @@
 | FR-C-02 | 使用者登入 | 讀者與管理員使用帳號密碼登入，成功後取得 JWT token。 | 高 |
 | FR-C-03 | 使用者登出 | 前端呼叫登出 API 後清除 token。 | 中 |
 | FR-C-04 | 查看個人資料 | 已登入使用者可查看自己的基本資料。 | 中 |
+| FR-C-05 | 首頁公開統計 | 訪客與登入者皆可查看公開統計與本月熱門借閱 Top 5。 | 中 |
 
 ### 4.2 讀者端功能
 
@@ -123,9 +129,11 @@
 | FR-A-08 | 使用者狀態管理 | 管理員可啟用或停用帳號。 | 高 |
 | FR-A-09 | 開通借書權限 | 管理員可解除讀者因逾期造成的借書暫停狀態。 | 中 |
 | FR-A-10 | 借閱紀錄管理 | 查看全體借閱紀錄，可依狀態篩選。 | 高 |
-| FR-A-11 | 歸還審核 | 針對讀者歸還申請確認書況並更新狀態。 | 高 |
-| FR-A-12 | 預約管理 | 查看預約清單，並通知讀者預約書籍可借。 | 中 |
-| FR-A-13 | Excel 匯入書籍 | 批次匯入書目與館藏資料。 | 低 |
+| FR-A-11 | 歸還審核 | 針對讀者歸還申請確認書況並更新狀態，支援批次正常歸還。 | 高 |
+| FR-A-12 | 預約管理 | 查看預約清單，僅在有可借館藏且為第一順位時通知讀者可借。 | 中 |
+| FR-A-13 | Excel 匯入書籍 | 下載範本並批次匯入書目與館藏資料。 | 中 |
+| FR-A-14 | Excel 報表下載 | 管理員可下載年度借閱統計 Excel 報表。 | 中 |
+| FR-A-15 | 管理員統計首頁 | 顯示借閱、預約、逾期與待審核等統計摘要。 | 中 |
 
 ### 4.4 系統背景功能
 
@@ -208,6 +216,10 @@
 | BR-V-04 | 管理員通知讀者可借時，預約狀態改為 `AVAILABLE_NOTICE`，並設定 `expire_date`。 |
 | BR-V-05 | 預約可取通知由 `NotificationService` 建立站內訊息並寄送 Email。 |
 | BR-V-06 | 讀者可取消 `WAITING` 或 `AVAILABLE_NOTICE` 狀態的預約。 |
+| BR-V-07 | 管理員通知可借前，後端必須確認該書目至少有一本 `copy_status = AVAILABLE` 的館藏。 |
+| BR-V-08 | 管理員通知可借前，後端必須確認該預約為同書目 `WAITING` 狀態中的第一順位。 |
+| BR-V-09 | 若無可借館藏，後端應回傳「目前無可借館藏，無法通知」類型錯誤訊息。 |
+| BR-V-10 | 預約已通知後，若讀者完成借閱，系統應將對應預約狀態改為 `COMPLETED`。 |
 
 ### 5.7 訊息與 Email 規則
 
@@ -245,6 +257,20 @@
 | 逾期檢查 | `OverdueNoticeScheduler` | 每日排程檢查到期與逾期紀錄。 |
 
 ---
+
+### 5.10 統計、報表與 Excel 匯入規則
+
+| 規則編號 | 規則內容 |
+|---|---|
+| BR-X-01 | 首頁公開統計 API 不需登入，僅回傳不涉及個資的彙總資料。 |
+| BR-X-02 | 首頁本月熱門借閱 Top 5 以 `borrow_records.borrow_date` 落在當月區間內的借閱紀錄統計。 |
+| BR-X-03 | 管理員統計 API 需驗證登入者為 `ADMIN`。 |
+| BR-X-04 | Excel 報表下載需驗證登入者為 `ADMIN`，前端以 `$http`、`arraybuffer` 與 Authorization header 下載。 |
+| BR-X-05 | 年度借閱統計 Excel 使用 Apache POI 產生 `.xlsx`，至少包含年度每月借閱統計、熱門書籍排行與讀者借閱排行。 |
+| BR-X-06 | 書目與館藏匯入範本一列代表一筆實體館藏；同一本書有多本館藏時，應以多列表示，`copyCode` 不同。 |
+| BR-X-07 | Excel 匯入時，`title`、`categoryId`、`copyCode` 為必要欄位，`copyCode` 必須唯一。 |
+| BR-X-08 | Excel 匯入時，若 `isbn` 已存在，使用既有書目並新增館藏；若 `isbn` 不存在，建立新書目與館藏。 |
+| BR-X-09 | Excel 匯入採單列錯誤不影響其他列的策略，最後回傳總列數、成功筆數、失敗筆數與錯誤明細。 |
 
 ## 6. 資料庫設計
 
@@ -508,6 +534,36 @@
 
 ---
 
+### UC-12 首頁公開統計與熱門借閱
+
+| 項目 | 說明 |
+|---|---|
+| 主要角色 | 訪客、讀者、管理員 |
+| 前置條件 | 無。 |
+| 主要流程 | 1. 使用者進入首頁。<br>2. 前端呼叫公開統計 API。<br>3. 後端回傳館藏書目數、可借館藏數、今日借閱數與本月借閱數。<br>4. 前端呼叫本月熱門借閱 Top 5 API。<br>5. 使用者可點擊熱門書籍進入書籍詳情頁。 |
+| 替代流程 | 若尚無借閱資料，熱門借閱區顯示空狀態。 |
+| 後置條件 | 首頁可提供未登入使用者有意義的圖書館資訊。 |
+
+### UC-13 管理員統計首頁與 Excel 報表下載
+
+| 項目 | 說明 |
+|---|---|
+| 主要角色 | 管理員 |
+| 前置條件 | 管理員已登入。 |
+| 主要流程 | 1. 管理員進入後台首頁。<br>2. 前端呼叫管理員統計摘要 API。<br>3. 後端回傳借閱中、逾期、歸還待審核、等待預約、已通知可取、今日借閱與本月借閱統計。<br>4. 管理員可輸入年度與排行榜筆數，下載年度借閱統計 Excel。<br>5. 後端使用 Apache POI 產生 `.xlsx` 檔案。 |
+| 替代流程 | 非管理員呼叫時，系統拒絕存取。 |
+| 後置條件 | 管理員可用 Excel 報表彙整借閱營運狀況。 |
+
+### UC-14 書目與館藏 Excel 批次匯入
+
+| 項目 | 說明 |
+|---|---|
+| 主要角色 | 管理員 |
+| 前置條件 | 管理員已登入，且已建立必要的書籍分類。 |
+| 主要流程 | 1. 管理員進入書目管理頁。<br>2. 下載匯入範本。<br>3. 依範本填寫書目與館藏資料。<br>4. 前端以 multipart/form-data 上傳 Excel。<br>5. 後端逐列讀取資料，建立書目與館藏。<br>6. 系統回傳總列數、成功筆數、失敗筆數與錯誤明細。 |
+| 替代流程 | 若分類不存在、館藏條碼重複或必填欄位缺漏，該列記錄錯誤並繼續處理其他列。 |
+| 後置條件 | 管理員可批次建立書目與實體館藏。 |
+
 ## 8. API 規格
 
 > 後端統一使用 `/api` 作為 REST API 前綴。  
@@ -561,6 +617,7 @@
 | AdminBorrow | GET | `/api/admin/borrows` | Header Authorization; query: `borrowStatus` | `List<BorrowResponse>` | 管理員查詢借閱紀錄 | 可篩選 `RETURN_PENDING`、`BORROWED` 等 | UC-06 |
 | AdminBorrow | GET | `/api/admin/borrows/return-pending` | Header Authorization | `List<BorrowResponse>` | 查詢歸還待審核 | 歸還審核頁使用 | UC-06 |
 | AdminBorrow | PATCH | `/api/admin/borrows/{borrowId}/approve-return` | Header Authorization; path: `borrowId`; query: `resultStatus` | `BorrowResponse` | 審核歸還 | `resultStatus` 限 `RETURNED`、`DAMAGED`、`LOST` | UC-06 |
+| AdminBorrow | PATCH | `/api/admin/borrows/approve-return/batch-normal` | Header Authorization; body: `List<Long>` | `List<BorrowResponse>` | 批次正常歸還審核 | 不新增 DTO；前端直接送借閱 ID 陣列 | UC-06 |
 
 ### 8.6 Reservation API
 
@@ -595,6 +652,23 @@
 
 ---
 
+
+### 8.9 Statistics API
+
+| 模組 | Method | API | 傳入值 | 回傳值 | 用途 | 前端注意 | 對應 UC |
+|---|---|---|---|---|---|---|---|
+| PublicStatistics | GET | `/api/statistics/public/summary` | 無 | `Map(totalBookCount, availableCopyCount, todayBorrowCount, monthBorrowCount)` | 首頁公開統計 | 不需 token；訪客可看 | UC-12 |
+| PublicStatistics | GET | `/api/statistics/public/top-borrowed-books` | query: `limit` | `List<Map(bookId, title, author, borrowCount)>` | 本月熱門借閱 Top N | 不需 token；首頁 Top 5 可點進詳情 | UC-12 |
+| AdminStatistics | GET | `/api/admin/statistics/summary` | Header Authorization; query: `year`, `month` | `Map(borrowingCount, overdueCount, returnPendingCount, waitingReservationCount, availableNoticeCount, todayBorrowCount, monthBorrowCount)` | 管理員後台統計摘要 | 管理員限定；`year/month` 未傳時可用當月 | UC-13 |
+
+### 8.10 Admin Report / Book Import API
+
+| 模組 | Method | API | 傳入值 | 回傳值 | 用途 | 前端注意 | 對應 UC |
+|---|---|---|---|---|---|---|---|
+| AdminReport | GET | `/api/admin/reports/borrow-statistics.xlsx` | Header Authorization; query: `year`, `topN` | `.xlsx` binary | 下載年度借閱統計 Excel | 前端需用 `$http`、`responseType: "arraybuffer"` 下載，不能用單純 `window.open` | UC-13 |
+| AdminBook | GET | `/api/admin/books/import-template` | Header Authorization | `.xlsx` binary | 下載書目與館藏匯入範本 | API 整合於 `AdminBookController`；前端同樣用 arraybuffer 下載 | UC-14 |
+| AdminBook | POST | `/api/admin/books/import` | Header Authorization; multipart/form-data: `file` | `Map(totalRows, successCount, failCount, errors)` | 上傳 Excel 批次匯入書目與館藏 | `Content-Type` 交由瀏覽器自動產生 multipart boundary；回傳錯誤列明細 | UC-14 |
+
 ## 9. 後端架構規劃
 
 ### 9.1 Spring Boot 分層架構
@@ -616,19 +690,23 @@
 
 ### 9.2 後端 Class 清單
 
-| 模組 | Entity | Repository | Service | Controller | DTO |
+| 模組 | Entity | Repository | Service | Controller | DTO / 回傳 |
 |---|---|---|---|---|---|
 | Auth | User | UserRepository | AuthService / AuthServiceImpl | AuthController | LoginRequest、LoginResponse、RegisterRequest |
 | User | User | UserRepository | AdminUserService / AdminUserServiceImpl | UserController、AdminUserController | UserResponse、AdminUserRequest |
 | Book Category | BookCategory | BookCategoryRepository | BookCategoryService / BookCategoryServiceImpl | BookCategoryController | BookCategoryResponse |
 | Book | Book | BookRepository | BookService、AdminBookService | BookController、AdminBookController | BookRequest、BookListResponse、BookDetailResponse |
+| Book Import | Book、BookCopy | BookRepository、BookCopyRepository、BookCategoryRepository | AdminBookImportService / AdminBookImportServiceImpl | AdminBookController | `Map<String,Object>`，不新增 DTO |
 | Book Copy | BookCopy | BookCopyRepository | AdminBookCopyService | AdminBookCopyController | BookCopyResponse |
 | Borrow | BorrowRecord | BorrowRecordRepository | BorrowService / BorrowServiceImpl | BorrowController、AdminBorrowController | BorrowResponse |
 | Reservation | Reservation | ReservationRepository | ReservationService / ReservationServiceImpl | ReservationController、AdminReservationController | ReservationResponse |
 | Message | Message | MessageRepository | MessageService / MessageServiceImpl | MessageController | MessageResponse |
+| Statistics | Book、BookCopy、BorrowRecord | BookRepository、BookCopyRepository、BorrowRecordRepository | StatisticsService / StatisticsServiceImpl | StatisticsController | `Map<String,Object>`、`List<Map<String,Object>>` |
+| Admin Statistics | BorrowRecord、Reservation | BorrowRecordRepository、ReservationRepository | AdminStatisticsService / AdminStatisticsServiceImpl | AdminStatisticsController | `Map<String,Object>` |
+| Admin Report | BorrowRecord | BorrowRecordRepository | AdminReportService / AdminReportServiceImpl | AdminReportController | `.xlsx` byte[] |
 | Notification | Message、BorrowRecord、Reservation | 無 | NotificationService / NotificationServiceImpl | 無 | 無 |
 | Mail | 無 | 無 | MailService / MailServiceImpl | 無 | 無 |
-| Scheduler | BorrowRecord、User | BorrowRecordRepository、UserRepository | NotificationService | OverdueNoticeScheduler | 無 |
+| Scheduler | BorrowRecord、User | BorrowRecordRepository、UserRepository | NotificationService | Scheduler | 無 |
 | Common | 無 | 無 | 無 | GlobalExceptionHandler | ApiResponse |
 | Util | 無 | 無 | 無 | 無 | IdGenerator、JwtUtil、LoginUserHolder |
 
@@ -723,43 +801,68 @@
 
 ## 11. 前端頁面規劃
 
-### 11.1 Angular 模組建議
+> 目前前端採 VSCode 開發，以 AngularJS 1.x 風格撰寫：HTML + JavaScript + `$scope` + `$http`。不使用 TypeScript router。頁面跳轉集中在 `app.js` 的 `IRead.goXXX()` 與 `IRead.bindCommonActions($scope)`。
 
-| 模組 | 說明 | 主要頁面 |
+### 11.1 前端共用架構
+
+| 檔案 / 區塊 | 說明 |
+|---|---|
+| `js/app.js` | 建立 `LibraryApp`、`IRead` namespace、登入資訊、權限檢查、共用頁面跳轉與共用導覽事件。 |
+| `js/api.js` | 集中管理所有後端 API 呼叫，API_BASE 必須包含 `/iread-library/api`。 |
+| `partials/reader-nav.html` | 讀者與訪客共用導覽列，提供首頁、館藏查詢、讀者中心、訊息中心、個人資料等入口。 |
+| `partials/admin-nav.html` | 管理員跨頁導覽列，僅保留首頁、後台管理、前台館藏查詢、訊息中心、個人資料、登出；後台功能由 `admin.html` tab 處理。 |
+| `css/style.css` | 統一頁面色系、卡片、表格、按鈕與響應式樣式。 |
+
+### 11.2 目前主要頁面
+
+| 頁面 | 對應 JS | 功能 |
 |---|---|---|
-| `auth` | 註冊、登入、登出 | register、login |
-| `reader` | 讀者端功能 | reader-home、book-search、book-detail、my-borrows、my-reservations、message-center、profile |
-| `admin` | 管理員端功能 | admin-dashboard、book-manage、book-copy-manage、user-manage、borrow-manage、return-review、reservation-manage |
-| `shared` | 共用元件 | navbar、sidebar、pagination、alert、confirm-dialog |
-| `core` | 核心服務 | auth.service、api.service、token.interceptor、auth.guard |
+| `index.html` | `index.js` | 首頁；顯示公開統計、熱門借閱 Top 5、登入後摘要與主要功能入口。 |
+| `login.html` | `auth.js` | 使用者登入。 |
+| `register.html` | `auth.js` | 讀者註冊。 |
+| `books.html` | `books.js` | 館藏查詢，訪客、讀者、管理員皆可使用。 |
+| `book-detail.html` | `book-detail.js` | 書籍詳情，讀者可借閱或預約；借閱成功導向 `reader.html?tab=borrows`，預約成功導向 `reader.html?tab=reservations`。 |
+| `reader.html` | `reader.js` | 讀者中心；以 tab 切換「我的借閱」與「我的預約」。 |
+| `admin.html` | `admin.js` | 管理員中心；以 tab 切換 dashboard、書目、館藏、借閱、歸還審核、預約、使用者管理。 |
+| `messages.html` | `messages.js` | 訊息中心；依登入角色載入 reader/admin 導覽列。 |
+| `profile.html` | `profile.js` | 個人資料頁。 |
 
-### 11.2 讀者端頁面
+### 11.3 `reader.html` 讀者中心 tab
 
-| 頁面 | 路由 | 功能 |
-|---|---|---|
-| 註冊頁 | `/register` | 讀者自行註冊。 |
-| 登入頁 | `/login` | 使用者登入。 |
-| 讀者首頁 | `/reader/home` | 顯示借閱摘要、未讀訊息、功能入口。 |
-| 館藏查詢頁 | `/books` | 查詢書籍、顯示可借數。 |
-| 書籍詳情頁 | `/books/:id` | 顯示書目資料與館藏狀態，可借閱或預約。 |
-| 我的借閱頁 | `/reader/borrows` | 查看目前借閱、申請歸還。 |
-| 我的預約頁 | `/reader/reservations` | 查看與取消預約。 |
-| 訊息中心 | `/reader/messages` | 查看、標記已讀、刪除訊息。 |
-| 個人資料頁 | `/reader/profile` | 查看個人資料。 |
+| Tab | 功能 |
+|---|---|
+| `borrows` | 查看目前借閱、逾期與歸還待審核紀錄，並可申請歸還。 |
+| `reservations` | 查看預約紀錄、取消預約，若狀態為 `AVAILABLE_NOTICE` 可借閱。 |
 
-### 11.3 管理員端頁面
+### 11.4 `admin.html` 管理員中心 tab
 
-| 頁面 | 路由 | 功能 |
-|---|---|---|
-| 後台首頁 | `/admin/dashboard` | 顯示待審核歸還、預約通知、逾期摘要。 |
-| 書目管理頁 | `/admin/books` | 新增、編輯、查詢書目。 |
-| 館藏冊本管理頁 | `/admin/book-copies` | 新增、編輯、查詢實體館藏。 |
-| 使用者管理頁 | `/admin/users` | 新增、編輯、查詢、停用使用者，開通借書權限。 |
-| 借閱紀錄管理頁 | `/admin/borrows` | 查看全部借閱紀錄。 |
-| 歸還審核頁 | `/admin/return-review` | 審核讀者歸還申請。 |
-| 預約管理頁 | `/admin/reservations` | 查看預約清單與通知讀者。 |
+| Tab | 功能 |
+|---|---|
+| `dashboard` | 後台統計摘要、Excel 年度借閱報表下載。 |
+| `books` | 新增、編輯、查詢書目；下載匯入範本與上傳 Excel 匯入書目與館藏。 |
+| `copies` | 新增、編輯、查詢館藏冊本；修改館藏狀態。 |
+| `borrows` | 查詢借閱紀錄，可依借閱狀態篩選。 |
+| `return-review` | 歸還審核，支援單筆審核與批次正常歸還。 |
+| `reservations` | 預約管理，顯示可借館藏數、是否第一順位與可否通知。 |
+| `users` | 使用者新增、編輯、查詢、啟用/停用與開通借書權限。 |
 
----
+### 11.5 頁面跳轉規則
+
+| 目的 | 統一入口 |
+|---|---|
+| 首頁 | `index.html` |
+| 館藏查詢 | `books.html` |
+| 書籍詳情 | `book-detail.html?bookId={bookId}` |
+| 讀者中心 | `reader.html` |
+| 我的借閱 | `reader.html?tab=borrows` |
+| 我的預約 | `reader.html?tab=reservations` |
+| 後台首頁 | `admin.html?tab=dashboard` |
+| 書目管理 | `admin.html?tab=books` |
+| 館藏管理 | `admin.html?tab=copies` 或 `admin.html?tab=copies&bookId={bookId}` |
+| 借閱紀錄 | `admin.html?tab=borrows` |
+| 歸還審核 | `admin.html?tab=return-review` |
+| 預約管理 | `admin.html?tab=reservations` |
+| 使用者管理 | `admin.html?tab=users` |
 
 ## 12. 驗收標準
 
@@ -784,7 +887,12 @@
 | AC-17 | 讀書心得完全移除 | 前端無心得頁面，後端無 Review API，資料表不建立 reviews / review_drafts。 |
 | AC-18 | ID 長度正確 | `user_id`、`book_id`、`copy_id` 不超過 `VARCHAR(20)`。 |
 | AC-19 | 中文圖書分類法正確 | `book_categories.category_id` 可使用 `000`、`100`、`900` 等分類代碼。 |
-| AC-20 | 前後端可串接 | Angular 可透過 REST API 完成查詢、借閱、歸還、預約、訊息與管理員維護流程。 |
+| AC-20 | 前後端可串接 | AngularJS 前端可透過 REST API 完成查詢、借閱、歸還、預約、訊息與管理員維護流程。 |
+| AC-21 | 首頁公開統計正常 | 未登入使用者可看到館藏書目數、可借館藏數、今日借閱數、本月借閱數與熱門借閱 Top 5。 |
+| AC-22 | 管理員統計正常 | 管理員後台首頁可由單一統計 API 顯示借閱、預約、逾期與待審核摘要。 |
+| AC-23 | Excel 報表可下載 | 管理員可下載年度借閱統計 `.xlsx`，且檔案可正常開啟並含多個 sheet。 |
+| AC-24 | Excel 匯入書目與館藏 | 管理員可下載範本、上傳 Excel，並看到成功筆數、失敗筆數與錯誤列明細。 |
+| AC-25 | 整合頁跳轉正確 | 讀者借閱/預約集中至 `reader.html`，管理員功能集中至 `admin.html`，不再導向已移除的舊頁。 |
 
 ---
 
@@ -795,9 +903,9 @@
 | 第一階段 | 完成核心借閱閉環 | 註冊、登入、查書、書目詳情、借閱、申請歸還、歸還審核、訊息。 |
 | 第二階段 | 補齊管理功能 | 管理員書目維護、館藏維護、使用者管理、預約管理、借閱紀錄管理。 |
 | 第三階段 | 補齊通知與逾期處理 | NotificationService、MailService、預約可取 Email、逾期排程、借書權限暫停。 |
-| 第四階段 | 優化與擴充 | Excel 匯入匯出、儀表板統計、密碼加密、批次新增館藏、預約自動配書。 |
-
----
+| 第四階段 | 統計與報表 | 首頁公開統計、熱門借閱 Top 5、管理員統計、Excel 年度報表下載。 |
+| 第五階段 | 批次資料維護 | Excel 匯入範本下載、書目與館藏批次匯入、匯入結果錯誤明細。 |
+| 第六階段 | 優化與擴充 | 密碼加密、批次新增館藏、預約自動配書、圖表化統計。 |
 
 ## 14. 從舊系統到新系統的改寫對照
 
@@ -835,13 +943,16 @@ library-backend/
     │   ├── BorrowController.java
     │   ├── MessageController.java
     │   ├── ReservationController.java
+    │   ├── StatisticsController.java
     │   ├── UserController.java
     │   └── admin/
     │       ├── AdminBookController.java
     │       ├── AdminBookCopyController.java
     │       ├── AdminBorrowController.java
-    │       ├── AdminUserController.java
-    │       └── AdminReservationController.java
+    │       ├── AdminReportController.java
+    │       ├── AdminReservationController.java
+    │       ├── AdminStatisticsController.java
+    │       └── AdminUserController.java
     ├── dto/
     │   ├── auth/
     │   ├── book/
@@ -854,8 +965,11 @@ library-backend/
     ├── exception/
     ├── repository/
     ├── scheduler/
-    │   └── OverdueNoticeScheduler.java
     ├── service/
+    │   ├── AdminBookImportService.java
+    │   ├── AdminReportService.java
+    │   ├── AdminStatisticsService.java
+    │   ├── StatisticsService.java
     │   └── impl/
     └── util/
         ├── IdGenerator.java
@@ -865,38 +979,36 @@ library-backend/
             └── LoginUserHolder.java
 ```
 
-### 15.2 前端 Angular
+### 15.2 前端實際目錄建議
 
 ```text
 library-frontend/
-└── src/app/
-    ├── core/
-    │   ├── services/
-    │   ├── guards/
-    │   └── interceptors/
-    ├── shared/
-    │   └── components/
-    ├── auth/
-    │   ├── login/
-    │   └── register/
-    ├── reader/
-    │   ├── book-search/
-    │   ├── book-detail/
-    │   ├── my-borrows/
-    │   ├── my-reservations/
-    │   ├── message-center/
-    │   └── profile/
-    └── admin/
-        ├── dashboard/
-        ├── book-manage/
-        ├── book-copy-manage/
-        ├── user-manage/
-        ├── borrow-manage/
-        ├── return-review/
-        └── reservation-manage/
+├── index.html
+├── login.html
+├── register.html
+├── books.html
+├── book-detail.html
+├── reader.html
+├── admin.html
+├── messages.html
+├── profile.html
+├── partials/
+│   ├── reader-nav.html
+│   └── admin-nav.html
+├── css/
+│   └── style.css
+└── js/
+    ├── app.js
+    ├── api.js
+    ├── auth.js
+    ├── index.js
+    ├── books.js
+    ├── book-detail.js
+    ├── reader.js
+    ├── admin.js
+    ├── messages.js
+    └── profile.js
 ```
-
----
 
 ## 16. 後續建議
 
@@ -911,44 +1023,54 @@ library-frontend/
 
 ### 16.2 批次新增館藏
 
-目前已支援單本新增館藏。若後台需要大量新增，可以補：
+目前已可透過 Excel 匯入達成同一本書多本館藏的批次建立。若後續要提供更快速的後台操作，可另補「同一本書一次新增 N 本館藏」：
 
 ```http
 POST /api/admin/books/{bookId}/copies/batch
 ```
 
-### 16.3 Excel 匯入匯出
+此功能適合管理員已建立書目後，直接輸入起始條碼、數量與位置，由系統自動建立多筆 `book_copies`。
 
-可列為展示後續功能，包含：
+### 16.3 Excel 匯入匯出優化
+
+目前規劃已包含年度借閱統計報表下載，以及書目與館藏 Excel 匯入。後續可再優化：
 
 ```text
-書目匯入
-館藏匯入
-借閱紀錄匯出
+1. 匯入前預檢模式，不直接寫入資料。
+2. 匯入結果下載錯誤報表。
+3. 範本加入欄位註解、下拉選單與分類代碼參照 sheet。
+4. 報表增加待處理清單 sheet，例如逾期、歸還待審核、等待預約通知。
 ```
 
 ### 16.4 預約自動配書
 
-目前預約可取通知由管理員操作。後續可擴充為：
+目前預約可取通知由管理員操作。後續可評估：
 
 ```text
-館藏歸還審核正常
-→ 系統自動查詢最早 WAITING 預約
-→ 自動通知第一位讀者
-→ 可選擇將館藏狀態改為 RESERVED
+館藏歸還成 AVAILABLE
+→ 系統自動檢查同書目 WAITING 預約
+→ 自動通知第一順位讀者
 ```
 
-### 16.5 前端串接優先順序
+此功能需小心處理館藏保留狀態、取書期限與多管理員同時操作問題。
 
-建議前端先做：
+### 16.5 圖表化統計
+
+目前前端以表格呈現統計。若時間允許，可於 `admin.html` dashboard 以簡易圖表顯示：
 
 ```text
-1. 登入 / 註冊 / 登出
-2. 公開查書 / 書籍詳情
-3. 讀者借閱 / 我的借閱 / 申請歸還
-4. 訊息中心
-5. 管理員書目 / 館藏維護
-6. 管理員歸還審核
-7. 管理員使用者管理
-8. 預約管理與逾期通知展示
+1. 年度每月借閱趨勢
+2. 熱門書籍排行
+3. 讀者借閱排行
+4. 逾期與歸還待審核數量
 ```
+
+### 16.6 前端串接與維護建議
+
+```text
+1. 所有頁面跳轉集中使用 app.js 的 IRead.goXXX()。
+2. 各頁 controller 初始化時呼叫 IRead.bindCommonActions($scope)。
+3. 不要在各頁 JS 重新用 location.href 指向已移除的舊頁，例如 my-borrows.html、admin-books.html。
+4. 讀者端集中於 reader.html，管理員端集中於 admin.html。
+```
+

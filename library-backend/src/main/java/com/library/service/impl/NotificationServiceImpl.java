@@ -1,5 +1,7 @@
 package com.library.service.impl;
 
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -11,6 +13,7 @@ import com.library.entity.BorrowRecord;
 import com.library.entity.Reservation;
 import com.library.entity.User;
 import com.library.entity.enums.MessageType;
+import com.library.repository.UserRepository;
 import com.library.service.MailService;
 import com.library.service.MessageService;
 import com.library.service.NotificationService;
@@ -26,6 +29,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     private MessageService messageService;
     private MailService mailService;
+    private UserRepository userRepository;
 
     @Override
     public void notifyBorrowSuccess(User receiver, BorrowRecord borrowRecord) {
@@ -154,6 +158,58 @@ public class NotificationServiceImpl implements NotificationService {
         );
 
         sendMailSafely(receiver, title, content);
+    }
+    
+    @Override
+    public void notifyReservationExpired(User receiver, Reservation reservation) {
+        Book book = reservation.getBook();
+
+        String title = "預約取書期限已過";
+        String content = "親愛的 " + receiver.getName() + " 您好：\n\n"
+                + "您預約的《" + book.getTitle() + "》已超過取書期限，"
+                + "系統已自動將本次預約狀態改為逾期。\n\n"
+                + "若仍需借閱，請重新預約或洽詢管理員。\n\n"
+                + "圖書館館藏管理系統";
+
+        messageService.createSystemMessage(
+                receiver,
+                title,
+                content,
+                MessageType.RESERVATION,
+                null,
+                reservation
+        );
+
+        sendMailSafely(receiver, title, content);
+    }
+
+    @Override
+    public void notifyAdminsReservationReady(Reservation reservation, long availableCount) {
+        Book book = reservation.getBook();
+        User reader = reservation.getUser();
+
+        String title = "預約書籍已有可借館藏";
+        String content = "《" + book.getTitle() + "》目前已有 "
+                + availableCount
+                + " 本可借館藏。\n\n"
+                + "目前下一順位讀者為："
+                + reader.getName()
+                + "（帳號：" + reader.getUsername() + "）。\n\n"
+                + "請至預約管理頁確認後，通知讀者可借閱。\n\n"
+                + "圖書館館藏管理系統";
+
+        List<User> admins = userRepository.findByRole("ADMIN");
+
+        for (User admin : admins) {
+            messageService.createSystemMessage(
+                    admin,
+                    title,
+                    content,
+                    MessageType.RESERVATION,
+                    null,
+                    reservation
+            );
+        }
     }
 
     private void sendMailSafely(User receiver, String title, String content) {

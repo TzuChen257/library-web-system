@@ -23,4 +23,9 @@ public class ReservationResponse {
 
     private String reservationStatus;
     private Integer queueOrder;
+    
+    // 管理員預約管理頁輔助欄位
+    private Integer availableCopyCount;
+    private Boolean firstInQueue;
+    private Boolean canNotify;
 }

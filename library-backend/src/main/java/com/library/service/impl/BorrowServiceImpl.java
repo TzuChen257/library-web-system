@@ -1,6 +1,7 @@
 package com.library.service.impl;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -12,14 +13,17 @@ import com.library.dto.borrow.BorrowResponse;
 import com.library.entity.Book;
 import com.library.entity.BookCopy;
 import com.library.entity.BorrowRecord;
+import com.library.entity.Reservation;
 import com.library.entity.User;
 import com.library.entity.enums.BookCopyStatus;
 import com.library.entity.enums.BorrowStatus;
+import com.library.entity.enums.ReservationStatus;
 import com.library.exception.LibraryBusinessException;
 import com.library.exception.ResponseCode;
 import com.library.repository.BookCopyRepository;
 import com.library.repository.BookRepository;
 import com.library.repository.BorrowRecordRepository;
+import com.library.repository.ReservationRepository;
 import com.library.repository.UserRepository;
 import com.library.service.BorrowService;
 import com.library.service.NotificationService;
@@ -39,6 +43,7 @@ public class BorrowServiceImpl implements BorrowService{
 	private BookRepository bookRepository;
 	private BookCopyRepository bookCopyRepository;
 	private UserRepository userRepository;
+	private ReservationRepository reservationRepository;
 	private NotificationService notificationService;
 
 	@Override
@@ -81,6 +86,8 @@ public class BorrowServiceImpl implements BorrowService{
         record.setBorrowStatus(BorrowStatus.BORROWED);
         
         BorrowRecord savedRecord=borrowRecordRepository.save(record);
+        
+        completeAvailableNoticeReservationIfExists(currentReader.getUserId(), bookId);
         //訊息確認
         notificationService.notifyBorrowSuccess(currentReader, savedRecord);
 		
@@ -181,7 +188,100 @@ public class BorrowServiceImpl implements BorrowService{
 
         notificationService.notifyReturnResult(savedRecord.getUser(), savedRecord);
 
+        if (resultStatus == BorrowStatus.RETURNED) {
+            notifyAdminsIfBookHasWaitingReservation(copy.getBook());
+        }
+
         return toBorrowResponse(savedRecord);
+	}
+	
+	@Override
+	@Transactional
+	public List<BorrowResponse> batchApproveNormalReturn(List<Long> borrowIds) {
+
+	    LoginUserHolder.requireAdmin();
+
+	    if (borrowIds == null || borrowIds.isEmpty()) {
+	        throw new LibraryBusinessException(ResponseCode.BORROW_BATCH_EMPTY);
+	    }
+
+	    List<BorrowResponse> responses = new ArrayList<>();
+
+	    for (Long borrowId : borrowIds) {
+
+	        BorrowRecord borrowRecord = borrowRecordRepository.findById(borrowId)
+	                .orElseThrow(() -> new LibraryBusinessException(ResponseCode.BORROW_RECORD_NOT_FOUND));
+
+	        if (borrowRecord.getBorrowStatus() != BorrowStatus.RETURN_PENDING) {
+	            throw new LibraryBusinessException(ResponseCode.BORROW_STATUS_INVALID);
+	        }
+
+	        BookCopy bookCopy = borrowRecord.getBookCopy();
+
+	        borrowRecord.setBorrowStatus(BorrowStatus.RETURNED);
+	        borrowRecord.setActualReturnDate(LocalDate.now());
+
+	        bookCopy.setCopyStatus(BookCopyStatus.AVAILABLE);
+
+	        BorrowRecord saved = borrowRecordRepository.save(borrowRecord);
+	        bookCopyRepository.save(bookCopy);
+
+	        notificationService.notifyReturnResult(saved.getUser(), saved);
+
+	        // 如果這本書有等待預約，通知管理員可以處理下一順位
+	        notifyAdminsIfBookHasWaitingReservation(bookCopy.getBook());
+
+	        responses.add(toBorrowResponse(saved));
+	    }
+
+	    return responses;
+	}
+	
+	private void notifyAdminsIfBookHasWaitingReservation(Book book) {
+
+	    if (book == null || book.getBookId() == null) {
+	        return;
+	    }
+
+	    String bookId = book.getBookId();
+
+	    Reservation nextWaitingReservation = reservationRepository
+	            .findFirstByBook_BookIdAndReservationStatusOrderByReservationDateAsc(
+	                    bookId,
+	                    ReservationStatus.WAITING
+	            )
+	            .orElse(null);
+
+	    if (nextWaitingReservation == null) {
+	        return;
+	    }
+
+	    long availableCount = bookCopyRepository.countByBook_BookIdAndCopyStatus(
+	            bookId,
+	            BookCopyStatus.AVAILABLE
+	    );
+
+	    if (availableCount <= 0) {
+	        return;
+	    }
+
+	    notificationService.notifyAdminsReservationReady(
+	            nextWaitingReservation,
+	            availableCount
+	    );
+	}
+	
+	private void completeAvailableNoticeReservationIfExists(String userId, String bookId) {
+	    reservationRepository
+	            .findFirstByUser_UserIdAndBook_BookIdAndReservationStatusOrderByReservationDateAsc(
+	                    userId,
+	                    bookId,
+	                    ReservationStatus.AVAILABLE_NOTICE
+	            )
+	            .ifPresent(reservation -> {
+	                reservation.setReservationStatus(ReservationStatus.COMPLETED);
+	                reservationRepository.save(reservation);
+	            });
 	}
 	
 	private User getCurrentReader() {
@@ -192,19 +292,31 @@ public class BorrowServiceImpl implements BorrowService{
 	}
 	
 	private BorrowResponse toBorrowResponse(BorrowRecord record) {
-        BookCopy copy = record.getBookCopy();
-        Book book = copy.getBook();
+	    BookCopy copy = record.getBookCopy();
+	    Book book = copy.getBook();
+	    User user = record.getUser();
 
-        BorrowResponse response = new BorrowResponse();
-        response.setBorrowId(record.getBorrowId());
-        response.setBookId(book.getBookId());
-        response.setTitle(book.getTitle());
-        response.setCopyId(copy.getCopyId());
-        response.setCopyCode(copy.getCopyCode());
-        response.setBorrowDate(record.getBorrowDate());
-        response.setDueDate(record.getDueDate());
-        response.setBorrowStatus(record.getBorrowStatus().name());
+	    BorrowResponse response = new BorrowResponse();
 
-        return response;
-    }
+	    response.setBorrowId(record.getBorrowId());
+
+	    response.setUserId(user.getUserId());
+	    response.setUsername(user.getUsername());
+	    response.setName(user.getName());
+
+	    response.setBookId(book.getBookId());
+	    response.setTitle(book.getTitle());
+
+	    response.setCopyId(copy.getCopyId());
+	    response.setCopyCode(copy.getCopyCode());
+
+	    response.setBorrowDate(record.getBorrowDate());
+	    response.setDueDate(record.getDueDate());
+	    response.setReturnRequestDate(record.getReturnRequestDate());
+	    response.setActualReturnDate(record.getActualReturnDate());
+
+	    response.setBorrowStatus(record.getBorrowStatus().name());
+
+	    return response;
+	}
 }

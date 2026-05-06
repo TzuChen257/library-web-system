@@ -15,7 +15,9 @@ public class WebConfig implements WebMvcConfigurer{
 	@Override
 	public void addCorsMappings(CorsRegistry registry) {
 		registry.addMapping("/api/**")//套用範圍，api以下所有網址
-				.allowedOrigins("http://localhost:5500")//允許範圍，跨網域可進入
+				.allowedOrigins(
+						"http://localhost:5500",
+                        "http://127.0.0.1:5500")//允許範圍，跨網域可進入
 				.allowedMethods("GET","POST","PUT","DELETE","PATCH","OPTIONS")
 				.allowedHeaders("*")//包含Content-Type or Authorization皆可
 				.allowCredentials(true);//允許傳送憑證

@@ -10,12 +10,23 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class BorrowResponse {
-	private Long borrowId;
+
+    private Long borrowId;
+
+    private String userId;
+    private String username;
+    private String name;
+
     private String bookId;
     private String title;
+
     private String copyId;
     private String copyCode;
+
     private LocalDate borrowDate;
     private LocalDate dueDate;
+    private LocalDate returnRequestDate;
+    private LocalDate actualReturnDate;
+
     private String borrowStatus;
 }
